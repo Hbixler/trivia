@@ -1,48 +1,54 @@
-//To add: Actually scoring??
-//To fix: Should only allow submitting one at a time
-//To fix: Isn't doing data validation right (after question one doesn't let blank)
-//To fix: Should be able to switch mode without generating new questions
+// Add semi-colons and ===
+// When I go to new page while on search filter and then clear filter, weird things happen
+
+// Make sure I understand Durstenfeld shuffle!
+// Understand DOM Parser
+// Understand how routers work
+// Export vs export default
+// Vue lifecycle
 
 <template>
     <div v-if="settings.numQuestion > 0 && settings.listView == 1">
-      <b-container class="questionbox" v-for="(question, index) in info" v-bind:key="index">
-        <b-row class="question" align-h="center">
-          <b-col md="auto">
-            <p>{{ question.question }}</p>
+      <b-container class="questionbox" v-for="(question, index) in questions" v-bind:key="`question-${index}`">
+        <b-row class="question mx-auto">
+          <b-col md="auto" v-if="question">
+            <p>{{ index + 1 }}. {{ question.question }}</p>
           </b-col>
         </b-row>
-        <b-row class="answers" align-h="center">
-          <b-col>
-            <b-form-group v-slot="{ thegroup }">
-            <b-form-radio-group :name="index" v-model="selected" :aria-describedby="thegroup" :options="answers[index]"></b-form-radio-group>
-            </b-form-group>
+        <b-row class="answers mx-auto">
+          <b-col v-if="question">
+            <div v-for="(answer, index2) in question.answers" :key="`answer-${index2}`">
+              <b-form-radio :name="`question-${index}`" @input="answerQuestion(answer, index)">{{ answer }}</b-form-radio>
+            </div>
           </b-col>
         </b-row>
       </b-container>
-      <b-button>Submit Answers</b-button>
+      <b-row class="mb-2">
+        <b-col><span style="color:red">{{ error }}</span></b-col>
+      </b-row>
+      <b-row>
+        <b-col><b-button class="mb-3" @click="score()">Submit Answers</b-button></b-col>
+      </b-row>
     </div>
     <div v-else-if="settings.listView == 0">
-        <b-container>
+        <b-container class="mb-5">
             <b-row>
-                <b-col align-self="center" md="auto"><b-button id="navigator" variant="outline-secondary" :disabled="currentQuestion == 1" @click="previous()">Previous Question</b-button></b-col>
                 <b-col>
-                    <b-container class="questionbox">
-                        <b-row class="question" align-h="center">
-                            <b-col md="auto">
-                                <p>{{ currentQuestion }}. {{ info[currentQuestion - 1].question }}</p>
+                    <b-container class="questionbox" v-if="questions[currentQuestion]">
+                        <b-row class="question mx-auto">
+                            <b-col md="auto" v-if="questions[currentQuestion]">
+                                <p>{{ currentQuestion + 1 }}. {{ questions[currentQuestion].question }}</p>
                             </b-col>
                         </b-row>
-                        <b-row class="answers" align-h="center">
-                            <b-col>
-                                <b-form-group v-slot="{ thegroup }">
-                                <b-form-radio-group :name="currentQuestion" v-model="selected" :aria-describedby="thegroup" :options="answers[currentQuestion - 1]"></b-form-radio-group>
-                                </b-form-group>
+                        <b-row class="answers mx-auto">
+                          <b-row class="mx-auto" v-for="rowIndex in questions[currentQuestion].answers.length / 2" :key="rowIndex">
+                            <b-col v-for="colIndex in 2" :key="colIndex" class="answer mx-auto">
+                              <b-button class="button" variant="outline-dark" @click="next(questions[currentQuestion].answers[colIndex + (rowIndex - 1) * 2 - 1])">{{ questions[currentQuestion].answers[colIndex + (rowIndex - 1) * 2 - 1] }}</b-button>
                             </b-col>
+                          </b-row>
                         </b-row>
                     </b-container>
                 </b-col>
-                <b-col align-self="center" md="auto"><b-button id="navigator" variant="outline-secondary" @click="next(selected)">
-                  <span v-if="currentQuestion < settings.numQuestion">Next Question</span><span v-else>Submit Answers</span></b-button></b-col>
             </b-row>
             <b-row>
               <b-col>
@@ -56,97 +62,109 @@
 </template>
 
 <script>
+import store from '../store';
 export default {
-  name: 'EnterDetails',
-  props: {
-      settings: {
-          numQuestion: Number, 
-          difficulty: String,
-          listView: Number,
-          update: Number
-        },
-  },
+  name: 'DisplayQuestions',
   data() {
       return {
-        info: [],
+        questions: [],
         answers: [],
-        currentQuestion: 1,
-        correctAnswers: 0
+        currentQuestion: 0,
+        currentAnswer: null,
+        correctAnswers: 0,
+        settings: this.$route.params.settings,
+        error: ''
       }
   },
-  watch: {
-      settings(newSetting) {
-          if (this.settings.update == 1) {
-              this.newQuestions(newSetting.numQuestion, newSetting.difficulty, newSetting.listView)
-          }
-      }
+  mounted() {
+    // console.log(this.username);
+    // console.log(this.settings);
+    this.getData();
   },
   methods: {
       async getData() {
       try {
         //alert("Running get data")
-        let response = await fetch('https://opentdb.com/api.php?amount=' + this.settings.numQuestion + '&difficulty=' + this.settings.difficulty)
+        let response = await fetch('https://opentdb.com/api.php?amount=' + this.settings.numQuestion + ((this.settings.difficulty === 'any') ? '' : ('&difficulty=' + this.settings.difficulty)) + ((this.settings.category === '-1') ? '' : ('&category=' + this.settings.category)));
+        // console.log('https://opentdb.com/api.php?amount=' + this.settings.numQuestion + 
         //alert('https://opentdb.com/api.php?amount=' + this.numQuestion)
-        this.info = await response.json()
-        this.info = this.info.results
-        this.generateAnswers()
+        const info = await response.json()
+        this.questions = info.results
+        for (const question of this.questions) {
+          question['userAnswer'] = null;
+          question.question = this.decodeFromHTML(question.question);
+          this.generateAnswers(question);
+        }
+        // console.log(this.questions);
       } catch (error) {
-        console.log(error)
+        console.error(error)
       }
     },
-    generateAnswers() {
+    decodeFromHTML(text) {
+      const parser = new DOMParser().parseFromString(text, "text/html");
+      return parser.documentElement.textContent;
+    },
+    shuffle(arr) {
+      for (let x = arr.length - 1; x > 0; x--) {
+        const randElement = Math.floor(Math.random() * (x + 1));
+        const temp = arr[x];
+        arr[x] = arr[randElement];
+        arr[randElement] = temp;
+      }
+    },
+    generateAnswers(question) {
       //alert("Being called")
-      for (let x = 0; x < this.info.length; x++) {
-        //alert("entering for loop")
-        //alert("Correct answer is" + this.info[x].correct_answer)
-        this.answers.push([this.info[x].correct_answer])
-        for (let y = 0; y < this.info[x].incorrect_answers.length; y++) {
-          this.answers[x].push(this.info[x].incorrect_answers[y])
-        }
-        // alert("Answer length is" + this.answers.length)
-      }
-    },
-    previous() {
-        if (this.currentQuestion > 1) {
-            this.currentQuestion--
-        }
-    },
-    next(selected) {
-      alert("Selected is " + selected)
-      if (selected == undefined || !(selected in this.answers[this.currentQuestion - 1])) {
-        alert("Answers at 0 is " + this.answers[this.currentQuestion - 1][0])
-        alert("Select an option first!")
-      }
-      else if (this.currentQuestion == this.settings.numQuestion) {
-        this.score()
+      if (question.type == 'boolean') {
+        question['answers'] = ['True', 'False'];
       }
       else {
-        if (selected == this.info[this.currentQuestion - 1].correct_answer) {
-          //alert("You got it right!")
-          this.correctAnswers++
+        let answers = [];
+        question.correct_answer = this.decodeFromHTML(question.correct_answer);
+        answers.push(question.correct_answer);
+        for (let answer of question.incorrect_answers) {
+          answer = this.decodeFromHTML(answer);
+          answers.push(answer);
         }
-        this.currentQuestion++
+        this.shuffle(answers);
+        question['answers'] = answers;
       }
     },
-    newQuestions(num, diff, listView) {
-    //alert("Running")
-    this.settings.numQuestion = num
-    this.settings.difficulty = diff
-    this.settings.listView = listView
-    this.settings.update = 0
-    this.currentQuestion = 1
-    this.info = []
-    this.answers = []
-    this.$emit('updated')
-    this.getData()
+    next(answer) {
+      // console.log(answer);
+      // alert("Selected is " + selected)
+      // const question = this.questions[this.currentQuestion];
+      if (this.currentQuestion + 1 == this.settings.numQuestion) {
+        // console.log('going to score');
+        this.score();
+      }
+      else {
+        // this.currentAnswer = this.questions[this.currentQuestion+1].userAnswer;
+        this.questions[this.currentQuestion].userAnswer = answer;
+        this.currentQuestion++;
+        // this.currentAnswer = this.questions[this.currentQuestion].userAnswer;
+      }
+    },
+    answerQuestion(answer, questionIndex) {
+      // console.log('question ', questionIndex, ' being answered with answer ', answer)
+      this.questions[questionIndex].userAnswer = answer
     },
     score() {
-      alert("You got " + this.correctAnswers + " out of " + this.settings.numQuestion + " correct!")
-      this.correctAnswers = 0
+      this.error = '';
+      for (const question of this.questions) {
+        if (question.userAnswer === null && this.settings.listView !== 0) {
+          this.correctAnswers = 0;
+          this.error = 'Please answer all questions first :)';
+          break;
+        }
+        if (question.userAnswer === question.correct_answer) {
+          this.correctAnswers++;
+        }
+      }
+      if (this.error.length === 0) {
+        store.actions.addAttempt(this.correctAnswers, this.settings.numQuestion);
+        this.$router.push({name: 'ViewScore', params: {score: this.correctAnswers, numQuestions: this.settings.numQuestion}});
+      }
     }
-  },
-  created() {
-      this.getData()
   }
 }
 </script>
@@ -157,20 +175,35 @@ export default {
   font-family: Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  text-align: center;
+  text-align: left;
   color: #2c3e50;
   margin-top: 60px;
 }
 .questionbox {
-  padding: 10px;
-  margin-bottom: 40px;
+  padding: 0px;
+  margin-bottom: 20px;
 }
 .question {
   background-color: rgb(27, 90, 74);
   color: white;
   border: 1px solid black;
+  text-align: left;
+  padding: 3px;
+  border-radius: 5px 5px 0px 0px;
+  width: 100%;
 }
 .answers {
-  background-color: rgb(119, 194, 175)
+  background-color: rgb(119, 194, 175);
+  text-align: left;
+  padding: 3px;
+  border-radius: 0px 0px 5px 5px;
+}
+.answer {
+  padding: 2px;
+  margin: 3px;
+}
+.button {
+  width: 99%;
+  height: 99%;
 }
 </style>

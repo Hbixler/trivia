@@ -1,42 +1,20 @@
 <template>
   <div id="app">
-    <img alt="Vue logo" src="./assets/logo.png">
-    <enter-details v-on:newquestions="newQuestions"></enter-details>
-    <display-questions v-on:updated="updated" :settings="{numQuestion: numQuestion, difficulty: difficulty, listView: listView, update: update}"></display-questions>
-    <HelloWorld msg="Welcome to Your Vue.js App"/>
+    <!--<center><router-link :to="{name: 'EnterDetails'}"><img alt="Vue logo" src="./assets/logo.png" height="100px"></router-link></center><br>-->
+    <div id="navBar">
+    <span>
+      <router-link :to="{name: 'EnterDetails'}">Home</router-link>
+       | 
+       <router-link :to="{name: 'ViewScore', params: {score: null, numQuestions: null}}">Leaderboard</router-link>
+    </span>
+    </div>
+    <router-view></router-view>
   </div>
 </template>
 
 <script>
-import DisplayQuestions from './components/DisplayQuestions.vue';
-import EnterDetails from './components/EnterDetails.vue';
-//import HelloWorld from './components/HelloWorld.vue'
 export default {
   name: 'App',
-  components: {
-    'enter-details': EnterDetails,
-    'display-questions': DisplayQuestions
-  },
-  data () {
-    return {
-      numQuestion: 0,
-      difficulty: 'easy',
-      listView: 1,
-      update: 0
-    }
-  },
-  methods: {
-    newQuestions(settings) {
-      //alert("Button pressed")
-      this.numQuestion = settings.num
-      this.difficulty = settings.difficulty
-      this.listView = settings.listView
-      this.update = 1
-    },
-    updated() {
-      this.update = 0
-    }
-  }
 }
 </script>
 
@@ -47,18 +25,16 @@ export default {
   -moz-osx-font-smoothing: grayscale;
   text-align: center;
   color: #2c3e50;
-  margin-top: 60px;
 }
-.questionbox {
-  padding: 10px;
-  margin-bottom: 40px;
-}
-.question {
+#navBar {
+  margin-bottom: 20px;
   background-color: rgb(27, 90, 74);
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 5px;
   color: white;
-  border: 1px solid black;
-}
-.answers {
-  background-color: rgb(119, 194, 175)
 }
 </style>
