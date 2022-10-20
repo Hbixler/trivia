@@ -1,15 +1,7 @@
-// Add semi-colons and ===
-// When I go to new page while on search filter and then clear filter, weird things happen
-
-// Make sure I understand Durstenfeld shuffle!
-// Understand DOM Parser
-// Understand how routers work
-// Export vs export default
-// Vue lifecycle
-
 <template>
-    <div v-if="settings.numQuestion > 0 && settings.listView == 1">
-      <b-container class="questionbox" v-for="(question, index) in questions" v-bind:key="`question-${index}`">
+    <div v-if="settings && settings.numQuestions > 0 && settings.listView">
+      <!-- Listing all questions at once -->
+      <b-container class="questionbox mx-auto" v-for="(question, index) in questions" v-bind:key="`question-${index}`">
         <b-row class="question mx-auto">
           <b-col md="auto" v-if="question">
             <p>{{ index + 1 }}. {{ question.question }}</p>
@@ -30,7 +22,8 @@
         <b-col><b-button class="mb-3" @click="score()">Submit Answers</b-button></b-col>
       </b-row>
     </div>
-    <div v-else-if="settings.listView == 0">
+    <div v-else-if="settings && !settings.listView">
+      <!-- One question at a time! -->
         <b-container class="mb-5">
             <b-row>
                 <b-col>
@@ -52,8 +45,8 @@
             </b-row>
             <b-row>
               <b-col>
-                <b-progress :max="settings.numQuestion" show-progress animated>
-                  <b-progress-bar variant="success" :value="currentQuestion" :label="`${((currentQuestion / settings.numQuestion) * 100).toFixed(0)}%`"></b-progress-bar>
+                <b-progress :max="settings.numQuestions" show-progress animated class="mt-3">
+                  <b-progress-bar variant="success" :value="currentQuestion" :label="`${((currentQuestion / settings.numQuestions) * 100).toFixed(0)}%`"></b-progress-bar>
                 </b-progress>
               </b-col>
             </b-row>
@@ -62,43 +55,41 @@
 </template>
 
 <script>
-import store from '../store';
 export default {
   name: 'DisplayQuestions',
   data() {
       return {
         questions: [],
-        answers: [],
         currentQuestion: 0,
-        currentAnswer: null,
         correctAnswers: 0,
         settings: this.$route.params.settings,
         error: ''
       }
   },
   mounted() {
-    // console.log(this.username);
-    // console.log(this.settings);
-    this.getData();
+    if (!this.settings) {
+      // User got here illegally :o
+      this.$router.push({name: 'EnterDetails'});
+    }
+    else {
+      this.getData();
+    }
   },
   methods: {
-      async getData() {
-      try {
-        //alert("Running get data")
-        let response = await fetch('https://opentdb.com/api.php?amount=' + this.settings.numQuestion + ((this.settings.difficulty === 'any') ? '' : ('&difficulty=' + this.settings.difficulty)) + ((this.settings.category === '-1') ? '' : ('&category=' + this.settings.category)));
-        // console.log('https://opentdb.com/api.php?amount=' + this.settings.numQuestion + 
-        //alert('https://opentdb.com/api.php?amount=' + this.numQuestion)
-        const info = await response.json()
-        this.questions = info.results
-        for (const question of this.questions) {
-          question['userAnswer'] = null;
-          question.question = this.decodeFromHTML(question.question);
-          this.generateAnswers(question);
-        }
-        // console.log(this.questions);
-      } catch (error) {
-        console.error(error)
-      }
+    async getData() {
+      this.$axios
+        .get('https://opentdb.com/api.php?amount=' + this.settings.numQuestions + ((this.settings.difficulty === 'any') ? '' : ('&difficulty=' + this.settings.difficulty)) + ((this.settings.category === '-1') ? '' : ('&category=' + this.settings.category)))
+        .then(response => {
+          this.questions = response.data.results;
+          for (const question of this.questions) {
+            question['userAnswer'] = null;
+            question.question = this.decodeFromHTML(question.question);
+            this.generateAnswers(question);
+          }
+        })
+        .catch(err => {
+          console.error(err);
+        });
     },
     decodeFromHTML(text) {
       const parser = new DOMParser().parseFromString(text, "text/html");
@@ -113,12 +104,12 @@ export default {
       }
     },
     generateAnswers(question) {
-      //alert("Being called")
-      if (question.type == 'boolean') {
+      if (question.type === 'boolean') {
         question['answers'] = ['True', 'False'];
       }
       else {
-        let answers = [];
+        // Data comes with correct and incorrect answers in separate arrays, here we assemble
+        const answers = [];
         question.correct_answer = this.decodeFromHTML(question.correct_answer);
         answers.push(question.correct_answer);
         for (let answer of question.incorrect_answers) {
@@ -130,58 +121,76 @@ export default {
       }
     },
     next(answer) {
-      // console.log(answer);
-      // alert("Selected is " + selected)
-      // const question = this.questions[this.currentQuestion];
-      if (this.currentQuestion + 1 == this.settings.numQuestion) {
-        // console.log('going to score');
+      if (this.currentQuestion + 1 === this.settings.numQuestions) {
         this.score();
       }
       else {
-        // this.currentAnswer = this.questions[this.currentQuestion+1].userAnswer;
         this.questions[this.currentQuestion].userAnswer = answer;
         this.currentQuestion++;
-        // this.currentAnswer = this.questions[this.currentQuestion].userAnswer;
       }
     },
     answerQuestion(answer, questionIndex) {
-      // console.log('question ', questionIndex, ' being answered with answer ', answer)
-      this.questions[questionIndex].userAnswer = answer
+      this.questions[questionIndex].userAnswer = answer;
     },
-    score() {
+    checkErrors() {
+      // Only checks for unanswered questions
       this.error = '';
-      for (const question of this.questions) {
-        if (question.userAnswer === null && this.settings.listView !== 0) {
+      const nullAnswers = [];
+      for (let x = 0; x < this.questions.length; x++) {
+        const question = this.questions[x];
+        if (question.userAnswer === null) {
+          // User did not answer!
+          nullAnswers.push(`${x + 1}`);
           this.correctAnswers = 0;
           this.error = 'Please answer all questions first :)';
-          break;
         }
+      }
+      if (nullAnswers.length === 1) {
+        this.error = 'Please answer Question ' + nullAnswers[0] + ' :)';
+      }
+      else if (nullAnswers.length > 1) {
+        this.error = 'Please answer the following questions:';
+        for (let x = 0; x < nullAnswers.length; x++) {
+          const answer = nullAnswers[x];
+          this.error += ' ' + answer;
+          if (x !== nullAnswers.length - 1) {
+            this.error += ',';
+          }
+        }
+      }
+    },
+    score() {
+      if (this.settings.listView) {
+        // No possible errors for one-at-a-time at this moment
+        this.checkErrors();
+      }
+      for (let x = 0; x < this.questions.length; x++) {
+        const question = this.questions[x];
         if (question.userAnswer === question.correct_answer) {
           this.correctAnswers++;
         }
       }
       if (this.error.length === 0) {
-        store.actions.addAttempt(this.correctAnswers, this.settings.numQuestion);
-        this.$router.push({name: 'ViewScore', params: {score: this.correctAnswers, numQuestions: this.settings.numQuestion}});
+        this.$store.actions.addAttempt(this.correctAnswers, this.settings.numQuestions);
+        this.$router.push({name: 'ViewScore', params: {score: this.correctAnswers, numQuestions: this.settings.numQuestions}});
       }
     }
   }
 }
 </script>
 
-<!-- Add "scoped" attribute to limit CSS to this component only -->
 <style scoped>
 #app {
   font-family: Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  text-align: left;
   color: #2c3e50;
   margin-top: 60px;
 }
 .questionbox {
   padding: 0px;
-  margin-bottom: 20px;
+  width: 95%;
+  margin: 20px 5px 5px 5px;
 }
 .question {
   background-color: rgb(27, 90, 74);

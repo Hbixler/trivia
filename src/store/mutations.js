@@ -1,5 +1,5 @@
 import state from './state';
-import uniqid from "uniqid";
+import uniqid from 'uniqid';
 
 const mutations = {
     addAttempt(username, score, numQuestions) {
@@ -14,6 +14,6 @@ const mutations = {
     editUsername(username) {
         state.username = username;
     }
-}
+};
 
 export default mutations;

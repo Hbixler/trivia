@@ -1,4 +1,4 @@
-import VueRouter from 'vue-router'
+import VueRouter from 'vue-router';
 const routes = [
     {
         path: '/',
@@ -11,8 +11,8 @@ const routes = [
         component: () => import('../components/DisplayQuestions'),
         props: (route) => {
             return {
-                settings: +route.params.setting,
-            }
+                settings: +route.params.settings,
+            };
         }
     },
     {

@@ -1,6 +1,5 @@
 <template>
   <div id="app">
-    <!--<center><router-link :to="{name: 'EnterDetails'}"><img alt="Vue logo" src="./assets/logo.png" height="100px"></router-link></center><br>-->
     <div id="navBar">
     <span>
       <router-link :to="{name: 'EnterDetails'}">Home</router-link>

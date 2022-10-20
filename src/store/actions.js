@@ -9,6 +9,6 @@ const actions = {
     editUsername(username) {
         mutations.editUsername(username);
     }
-}
+};
 
 export default actions;

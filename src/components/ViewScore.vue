@@ -10,7 +10,7 @@
       </b-row>
       <b-table :items="filteredItems" :fields="fields" :current-page="currentPage" fixed :per-page="10" id="attempts" v-if="itemCount > 0" sort-by="score" :sort-desc="true">
         <template v-slot:cell(score) = "{ item }">
-          {{ item.score }}%
+          {{ item.score.toFixed(0) }}%
         </template>
       </b-table>
       <b-row class="mb-3" v-else-if="items.length === 0"><center>Take a quiz in order to get a score!</center></b-row>
@@ -21,7 +21,6 @@
 </template>
 
 <script>
-import store from '../store'
 export default {
   name: 'ViewScore',
   data() {
@@ -38,21 +37,17 @@ export default {
           itemCount: 0,
           currentPage: 1,
           usernameSearchInput: '',
-          prevSearchInput: '',
-          prevFilterId: 0,
           filteredItems: []
       }
-  },
-  computed: {
-    attempts() {
-      // console.log(store.state);
-      return store.getters.getAttempts();
-    }
   },
   watch: {
     usernameSearchInput(newInput) {
       this.filterRows(newInput);
     }
+  },
+  mounted() {
+    this.attempts = this.$store.getters.getAttempts();
+    this.fillTable();
   },
   methods: {
       filterRows(filter) {
@@ -75,38 +70,6 @@ export default {
           }
         }
       },
-      searchUsernames(row) {
-        console.log('new search');
-        if (this.usernameSearchInput.trim() === '') {
-          return true;
-        }
-        else if (this.usernameSearchInput !== this.prevSearchInput) {
-          // console.log('new search');
-          console.log('input is ', this.usernameSearchInput);
-          this.itemCount = 0;
-          this.currentPage = 1;
-          this.prevFilterId = 0;
-        }
-        const input = this.usernameSearchInput.toLowerCase().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
-        const regex = new RegExp(input);
-        this.prevSearchInput = this.usernameSearchInput;
-        const result = regex.test(row.username.toLowerCase());
-        // console.log('username is ', row.username.toLowerCase());
-        // console.log('result is ', result)
-        if (result) {
-          // console.log('row id is ', row.id);
-          if (row.id !== this.prevFilterId && this.prevFilterId !== -1) {
-            // console.log('increasing item count');
-            this.itemCount++;
-            this.prevFilterId = row.id;
-          }
-          else {
-            this.prevFilterId = -1;
-          }
-        }
-        // console.log('returning ', result);
-        return result;
-      },
       fillTable() {
         this.itemCount = this.attempts.length;
           for (const attempt of this.attempts) {
@@ -115,34 +78,22 @@ export default {
             newItem['username'] = attempt.username;
             newItem['num_correct'] = attempt.score;
             newItem['total_questions'] = attempt.numQuestions;
-            newItem['score'] = 100 * (attempt.score / attempt.numQuestions).toFixed(2);
+            newItem['score'] = 100 * (attempt.score / attempt.numQuestions);
             if (attempt.id === this.attempts[this.itemCount - 1].id) {
+              // Most recent attempt
               newItem['_rowVariant'] = 'warning';
             }
             this.items.push(newItem);
             this.filteredItems.push(newItem);
           }
       }
-  },
-  mounted() {
-    this.fillTable();
-    // console.log('viewing score')
   }
 }
 </script>
 
-<!-- Add "scoped" attribute to limit CSS to this component only -->
 <style>
 h3 {
   margin: 40px 0 0;
-}
-ul {
-  list-style-type: none;
-  padding: 0;
-}
-li {
-  display: inline-block;
-  margin: 0 10px;
 }
 a {
   color: white;

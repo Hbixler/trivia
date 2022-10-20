@@ -7,6 +7,6 @@ const getters = {
     getUsername() {
         return state.username;
     }
-}
+};
 
 export default getters;
